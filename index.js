@@ -448,31 +448,39 @@ if (!isMainThread) {
     }
   }
 
-  function displayStats(userData) {
-    if (!userData || !userData.stats) {
-      log('No valid stats data available to display', 'WARN');
-      return;
-    }
-
-    console.clear();
-    console.log('=============================================');
-    console.log('   STORK ORACLE AUTO BOT - AIRDROP INSIDERS  ');
-    console.log('=============================================');
-    console.log(`Time: ${getTimestamp()}`);
-    console.log('---------------------------------------------');
-    console.log(`User: ${userData.email || 'N/A'}`);
-    console.log(`ID: ${userData.id || 'N/A'}`);
-    console.log(`Referral Code: ${userData.referral_code || 'N/A'}`);
-    console.log('---------------------------------------------');
-    console.log('VALIDATION STATISTICS:');
-    console.log(`✓ Valid Validations: ${userData.stats.stork_signed_prices_valid_count || 0}`);
-    console.log(`✗ Invalid Validations: ${userData.stats.stork_signed_prices_invalid_count || 0}`);
-    console.log(`↻ Last Validated At: ${userData.stats.stork_signed_prices_last_verified_at || 'Never'}`);
-    console.log(`👥 Referral Usage Count: ${userData.stats.referral_usage_count || 0}`);
-    console.log('---------------------------------------------');
-    console.log(`Next validation in ${config.stork.intervalSeconds} seconds...`);
-    console.log('=============================================');
+function displayStats(userData) {
+  if (!userData || !userData.stats) {
+    log('No valid stats data available to display', 'WARN');
+    return;
   }
+
+  console.clear();
+  // Your ASCII Banner
+  const banner = `
+       █████╗ ██████╗ ██████╗     ███╗   ██╗ ██████╗ ██████╗ ███████╗
+      ██╔══██╗██╔══██╗██╔══██╗    ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
+      ███████║██║  ██║██████╔╝    ██╔██╗ ██║██║   ██║██║  ██║█████╗  
+      ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
+      ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
+      ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
+  `.trim();
+
+  console.log(banner);
+  console.log(`Time: ${getTimestamp()}`);
+  console.log('---------------------------------------------');
+  console.log(`User: ${userData.email || 'N/A'}`);
+  console.log(`ID: ${userData.id || 'N/A'}`);
+  console.log(`Referral Code: ${userData.referral_code || 'N/A'}`);
+  console.log('---------------------------------------------');
+  console.log('VALIDATION STATISTICS:');
+  console.log(`✓ Valid Validations: ${userData.stats.stork_signed_prices_valid_count || 0}`);
+  console.log(`✗ Invalid Validations: ${userData.stats.stork_signed_prices_invalid_count || 0}`);
+  console.log(`↻ Last Validated At: ${userData.stats.stork_signed_prices_last_verified_at || 'Never'}`);
+  console.log(`👥 Referral Usage Count: ${userData.stats.referral_usage_count || 0}`);
+  console.log('---------------------------------------------');
+  console.log(`Next validation in ${config.stork.intervalSeconds} seconds...`);
+  console.log('=============================================');
+}
 
   async function main() {
     if (!validateConfig()) {
