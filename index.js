@@ -7,6 +7,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { accounts } from "./accounts.js";
 import { fileURLToPath } from 'url';
+import chalk from 'chalk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -464,28 +465,28 @@ if (!isMainThread) {
     }
 
     console.clear();
-    console.log(`
+    console.log(chalk.cyan(`
        █████╗ ██████╗ ██████╗     ███╗   ██╗ ██████╗ ██████╗ ███████╗
       ██╔══██╗██╔══██╗██╔══██╗    ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
       ███████║██║  ██║██████╔╝    ██╔██╗ ██║██║   ██║██║  ██║█████╗  
       ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
       ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
       ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
-    `);
-    console.log(`Time: ${getTimestamp()}`);
-    console.log('---------------------------------------------');
-    console.log(`User: ${userData.email || 'N/A'}`);
-    console.log(`ID: ${userData.id || 'N/A'}`);
-    console.log(`Referral Code: ${userData.referral_code || 'N/A'}`);
-    console.log('---------------------------------------------');
-    console.log('VALIDATION STATISTICS:');
-    console.log(`✓ Valid Validations: ${userData.stats.stork_signed_prices_valid_count || 0}`);
-    console.log(`✗ Invalid Validations: ${userData.stats.stork_signed_prices_invalid_count || 0}`);
-    console.log(`↻ Last Validated At: ${userData.stats.stork_signed_prices_last_verified_at || 'Never'}`);
-    console.log(`👥 Referral Usage Count: ${userData.stats.referral_usage_count || 0}`);
-    console.log('---------------------------------------------');
-    console.log(`Next validation in ${config.stork.intervalSeconds} seconds...`);
-    console.log('=============================================');
+    `));
+    console.log(`Time: ${chalk.green(getTimestamp())}`);
+    console.log(chalk.gray('---------------------------------------------'));
+    console.log(`User: ${chalk.white(userData.email || 'N/A')}`);
+    console.log(`ID: ${chalk.white(userData.id || 'N/A')}`);
+    console.log(`Referral Code: ${chalk.white(userData.referral_code || 'N/A')}`);
+    console.log(chalk.gray('---------------------------------------------'));
+    console.log(chalk.bold('VALIDATION STATISTICS:'));
+    console.log(`✓ Valid Validations: ${chalk.green(userData.stats.stork_signed_prices_valid_count || 0)}`);
+    console.log(`✗ Invalid Validations: ${chalk.red(userData.stats.stork_signed_prices_invalid_count || 0)}`);
+    console.log(`↻ Last Validated At: ${chalk.yellow(userData.stats.stork_signed_prices_last_verified_at || 'Never')}`);
+    console.log(`👥 Referral Usage Count: ${chalk.cyan(userData.stats.referral_usage_count || 0)}`);
+    console.log(chalk.gray('---------------------------------------------'));
+    console.log(`Next validation in ${chalk.magenta(config.stork.intervalSeconds)} seconds...`);
+    console.log(chalk.gray('============================================='));
   }
 
   async function main() {
