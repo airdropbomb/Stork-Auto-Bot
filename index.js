@@ -5,14 +5,11 @@ import path from 'path';
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { accounts } from "./accounts.js"
+import { accounts } from "./accounts.js";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-
-// global.navigator = { userAgent: 'node' };
 
 // Load configuration from config.json
 function loadConfig() {
@@ -21,14 +18,13 @@ function loadConfig() {
 
     if (!fs.existsSync(configPath)) {
       log(`Config file not found at ${configPath}, using default configuration`, 'WARN');
-      // Create default config file if it doesn't exist
       const defaultConfig = {
         cognito: {
           region: 'ap-northeast-1',
           clientId: '5msns4n49hmg3dftp2tp1t2iuh',
           userPoolId: 'ap-northeast-1_M22I44OpC',
-          username: '',  // To be filled by user
-          password: ''   // To be filled by user
+          username: '',
+          password: ''
         },
         stork: {
           intervalSeconds: 10
@@ -77,7 +73,7 @@ const config = {
 function validateConfig() {
   if (!accounts[0].username || !accounts[0].password) {
     log('ERROR: Username and password must be set in accounts.js', 'ERROR');
-    console.log('\nPlease update your accouns.js file with your credentials:');
+    console.log('\nPlease update your accounts.js file with your credentials:');
     console.log(JSON.stringify({
         username: "YOUR_EMAIL",
         password: "YOUR_PASSWORD"
@@ -450,9 +446,9 @@ if (!isMainThread) {
       log(`Failed: ${actualInvalidIncrease}`);
       log('--------- COMPLETE ---------');
       
-      if(jobs < accounts.length) {
+      if (jobs < accounts.length) {
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
-      } else if(jobs == accounts.length - 1 || jobs === accounts.length) {
+      } else if (jobs == accounts.length - 1 || jobs === accounts.length) {
         jobs = 0;
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
       } 
@@ -475,7 +471,9 @@ if (!isMainThread) {
       ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
       ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
       ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
-`);
+    `);
+    console.log(`Time: ${getTimestamp()}`);
+    console.log('---------------------------------------------');
     console.log(`User: ${userData.email || 'N/A'}`);
     console.log(`ID: ${userData.id || 'N/A'}`);
     console.log(`Referral Code: ${userData.referral_code || 'N/A'}`);
@@ -505,8 +503,8 @@ if (!isMainThread) {
 
       runValidationProcess(tokenManager);
       
-      //prevent spam by disabling this interval, because up there was triggered with jobs sequence
-//     setInterval(() => runValidationProcess(tokenManager), config.stork.intervalSeconds * 1000);
+      // prevent spam by disabling this interval, because up there was triggered with jobs sequence
+      // setInterval(() => runValidationProcess(tokenManager), config.stork.intervalSeconds * 1000);
 
       setInterval(async () => {
         await tokenManager.getValidToken();
