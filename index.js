@@ -5,12 +5,14 @@ import path from 'path';
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { accounts } from "./accounts.js";
+import { accounts } from "./accounts.js"
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+
+// global.navigator = { userAgent: 'node' };
 
 // Load configuration from config.json
 function loadConfig() {
@@ -19,19 +21,18 @@ function loadConfig() {
 
     if (!fs.existsSync(configPath)) {
       log(`Config file not found at ${configPath}, using default configuration`, 'WARN');
+      // Create default config file if it doesn't exist
       const defaultConfig = {
         cognito: {
           region: 'ap-northeast-1',
           clientId: '5msns4n49hmg3dftp2tp1t2iuh',
           userPoolId: 'ap-northeast-1_M22I44OpC',
-          username: '',
-          password: ''
-        },
+          },
         stork: {
-          intervalSeconds: 10
+          intervalSeconds: 30
         },
         threads: {
-          maxWorkers: 10
+          maxWorkers: 1
         }
       };
       fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
@@ -74,7 +75,7 @@ const config = {
 function validateConfig() {
   if (!accounts[0].username || !accounts[0].password) {
     log('ERROR: Username and password must be set in accounts.js', 'ERROR');
-    console.log('\nPlease update your accounts.js file with your credentials:');
+    console.log('\nPlease update your accouns.js file with your credentials:');
     console.log(JSON.stringify({
         username: "YOUR_EMAIL",
         password: "YOUR_PASSWORD"
@@ -103,6 +104,13 @@ function log(message, type = 'INFO') {
 
 function loadProxies() {
   try {
+    const rotate = arr => {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        return arr;
+      };
     if (!fs.existsSync(config.threads.proxyFile)) {
       log(`Proxy file not found at ${config.threads.proxyFile}, creating empty file`, 'WARN');
       fs.writeFileSync(config.threads.proxyFile, '', 'utf8');
@@ -113,8 +121,10 @@ function loadProxies() {
       .split('\n')
       .map(line => line.trim())
       .filter(line => line && !line.startsWith('#'));
+    const rotatedProxy = rotate(proxies);
     log(`Loaded ${proxies.length} proxies from ${config.threads.proxyFile}`);
-    return proxies;
+    log(`trying run with ${rotatedProxy[0]}`);
+    return rotatedProxy;
   } catch (error) {
     log(`Error loading proxies: ${error.message}`, 'ERROR');
     return [];
@@ -392,7 +402,7 @@ if (!isMainThread) {
       }
 
       const signedPrices = await getSignedPrices(tokens);
-      const proxies = loadProxies();
+      const proxies = await loadProxies();
 
       if (!signedPrices || signedPrices.length === 0) {
         log('No data to validate');
@@ -442,14 +452,14 @@ if (!isMainThread) {
 
       displayStats(updatedUserData);
       log(`--------- VALIDATION SUMMARY ---------`);
-      log(`Total data processed: ${actualValidIncrease + actualInvalidIncrease}`);
+      log(`Total data processed: ${newValidCount}`);
       log(`Successful: ${actualValidIncrease}`);
       log(`Failed: ${actualInvalidIncrease}`);
       log('--------- COMPLETE ---------');
       
-      if (jobs < accounts.length) {
+      if(jobs < accounts.length) {
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
-      } else if (jobs == accounts.length - 1 || jobs === accounts.length) {
+      } else if(jobs == accounts.length - 1 || jobs === accounts.length) {
         jobs = 0;
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
       } 
@@ -465,28 +475,26 @@ if (!isMainThread) {
     }
 
     console.clear();
-    console.log(chalk.cyan(`
-       █████╗ ██████╗ ██████╗     ███╗   ██╗ ██████╗ ██████╗ ███████╗
-      ██╔══██╗██╔══██╗██╔══██╗    ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
-      ███████║██║  ██║██████╔╝    ██╔██╗ ██║██║   ██║██║  ██║█████╗  
-      ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
-      ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
-      ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
-    `));
-    console.log(`Time: ${chalk.green(getTimestamp())}`);
-    console.log(chalk.gray('---------------------------------------------'));
-    console.log(`User: ${chalk.white(userData.email || 'N/A')}`);
-    console.log(`ID: ${chalk.white(userData.id || 'N/A')}`);
-    console.log(`Referral Code: ${chalk.white(userData.referral_code || 'N/A')}`);
-    console.log(chalk.gray('---------------------------------------------'));
-    console.log(chalk.bold('VALIDATION STATISTICS:'));
-    console.log(`✓ Valid Validations: ${chalk.green(userData.stats.stork_signed_prices_valid_count || 0)}`);
-    console.log(`✗ Invalid Validations: ${chalk.red(userData.stats.stork_signed_prices_invalid_count || 0)}`);
-    console.log(`↻ Last Validated At: ${chalk.yellow(userData.stats.stork_signed_prices_last_verified_at || 'Never')}`);
-    console.log(`👥 Referral Usage Count: ${chalk.cyan(userData.stats.referral_usage_count || 0)}`);
-    console.log(chalk.gray('---------------------------------------------'));
-    console.log(`Next validation in ${chalk.magenta(config.stork.intervalSeconds)} seconds...`);
-    console.log(chalk.gray('============================================='));
+    console.log   █████╗ ██████╗ ██████╗     ███╗   ██╗ ██████╗ ██████╗ ███████╗
+    console.log  ██╔══██╗██╔══██╗██╔══██╗    ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
+    console.log  ███████║██║  ██║██████╔╝    ██╔██╗ ██║██║   ██║██║  ██║█████╗  
+    console.log  ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
+    console.log  ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
+    console.log  ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝   
+    console.log(`Time: ${getTimestamp()}`);
+    console.log('---------------------------------------------');
+    console.log(`User: ${userData.email || 'N/A'}`);
+    console.log(`ID: ${userData.id || 'N/A'}`);
+    console.log(`Referral Code: ${userData.referral_code || 'N/A'}`);
+    console.log('---------------------------------------------');
+    console.log('VALIDATION STATISTICS:');
+    console.log(`✓ Valid Validations: ${userData.stats.stork_signed_prices_valid_count || 0}`);
+    console.log(`✗ Invalid Validations: ${userData.stats.stork_signed_prices_invalid_count || 0}`);
+    console.log(`↻ Last Validated At: ${userData.stats.stork_signed_prices_last_verified_at || 'Never'}`);
+    console.log(`👥 Referral Usage Count: ${userData.stats.referral_usage_count || 0}`);
+    console.log('---------------------------------------------');
+    console.log(`Next validation in ${config.stork.intervalSeconds} seconds...`);
+    console.log('=============================================');
   }
 
   async function main() {
@@ -504,8 +512,8 @@ if (!isMainThread) {
 
       runValidationProcess(tokenManager);
       
-      // prevent spam by disabling this interval, because up there was triggered with jobs sequence
-      // setInterval(() => runValidationProcess(tokenManager), config.stork.intervalSeconds * 1000);
+      //prevent spam by disabling this interval, because up there was triggered with jobs sequence
+//     setInterval(() => runValidationProcess(tokenManager), config.stork.intervalSeconds * 1000);
 
       setInterval(async () => {
         await tokenManager.getValidToken();
