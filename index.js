@@ -5,40 +5,34 @@ import path from 'path';
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { accounts } from "./accounts.js"
+import { accounts } from "./accounts.js";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
-// global.navigator = { userAgent: 'node' };
-
 // Load configuration from config.json
 function loadConfig() {
   try {
     const configPath = path.join(__dirname, 'config.json');
-
     if (!fs.existsSync(configPath)) {
       log(`Config file not found at ${configPath}, using default configuration`, 'WARN');
-      // Create default config file if it doesn't exist
       const defaultConfig = {
         cognito: {
           region: 'ap-northeast-1',
           clientId: '5msns4n49hmg3dftp2tp1t2iuh',
           userPoolId: 'ap-northeast-1_M22I44OpC',
-          },
+        },
         stork: {
-          intervalSeconds: 30
+          intervalSeconds: 60 // Increased to 60 seconds to reduce rate limit issues
         },
         threads: {
-          maxWorkers: 1
+          maxWorkers: 3 // Reduced to 3 workers for less parallel requests
         }
       };
       fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
       return defaultConfig;
     }
-    
     const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     log('Configuration loaded successfully from config.json \n');
     log('Accounts loaded successfully from accounts.js');
@@ -62,12 +56,12 @@ const config = {
     baseURL: 'https://app-api.jp.stork-oracle.network/v1',
     authURL: 'https://api.jp.stork-oracle.network/auth',
     tokenPath: path.join(__dirname, 'tokens.json'),
-    intervalSeconds: userConfig.stork?.intervalSeconds || 10,
+    intervalSeconds: userConfig.stork?.intervalSeconds || 60,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
     origin: 'chrome-extension://knnliglhgkmlblppdejchidfihjnockl'
   },
   threads: {
-    maxWorkers: userConfig.threads?.maxWorkers || 10,
+    maxWorkers: userConfig.threads?.maxWorkers || 3,
     proxyFile: path.join(__dirname, 'proxies.txt')
   }
 };
@@ -75,10 +69,10 @@ const config = {
 function validateConfig() {
   if (!accounts[0].username || !accounts[0].password) {
     log('ERROR: Username and password must be set in accounts.js', 'ERROR');
-    console.log('\nPlease update your accouns.js file with your credentials:');
+    console.log('\nPlease update your accounts.js file with your credentials:');
     console.log(JSON.stringify({
-        username: "YOUR_EMAIL",
-        password: "YOUR_PASSWORD"
+      username: "YOUR_EMAIL",
+      password: "YOUR_PASSWORD"
     }, null, 2));
     return false;
   }
@@ -105,12 +99,12 @@ function log(message, type = 'INFO') {
 function loadProxies() {
   try {
     const rotate = arr => {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-          }
-        return arr;
-      };
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
     if (!fs.existsSync(config.threads.proxyFile)) {
       log(`Proxy file not found at ${config.threads.proxyFile}, creating empty file`, 'WARN');
       fs.writeFileSync(config.threads.proxyFile, '', 'utf8');
@@ -302,26 +296,34 @@ async function getSignedPrices(tokens) {
   }
 }
 
-async function sendValidation(tokens, msgHash, isValid, proxy) {
-  try {
-    const agent = getProxyAgent(proxy);
-    const response = await axios({
-      method: 'POST',
-      url: `${config.stork.baseURL}/stork_signed_prices/validations`,
-      headers: {
-        'Authorization': `Bearer ${tokens.accessToken}`,
-        'Content-Type': 'application/json',
-        'Origin': config.stork.origin,
-        'User-Agent': config.stork.userAgent
-      },
-      httpsAgent: agent,
-      data: { msg_hash: msgHash, valid: isValid }
-    });
-    log(`✓ Validation successful for ${msgHash.substring(0, 10)}... via ${proxy || 'direct'}`);
-    return response.data;
-  } catch (error) {
-    log(`✗ Validation failed for ${msgHash.substring(0, 10)}...: ${error.message}`, 'ERROR');
-    throw error;
+async function sendValidation(tokens, msgHash, isValid, proxy, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay between requests
+      const agent = getProxyAgent(proxy);
+      const response = await axios({
+        method: 'POST',
+        url: `${config.stork.baseURL}/stork_signed_prices/validations`,
+        headers: {
+          'Authorization': `Bearer ${tokens.accessToken}`,
+          'Content-Type': 'application/json',
+          'Origin': config.stork.origin,
+          'User-Agent': config.stork.userAgent
+        },
+        httpsAgent: agent,
+        data: { msg_hash: msgHash, valid: isValid }
+      });
+      log(`✓ Validation successful for ${msgHash.substring(0, 10)}... via ${proxy || 'direct'}`);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 429 && i < retries - 1) {
+        log(`Too many requests, retrying in ${5 * (i + 1)} seconds...`, 'WARN');
+        await new Promise(resolve => setTimeout(resolve, 5000 * (i + 1)));
+        continue;
+      }
+      log(`✗ Validation failed for ${msgHash.substring(0, 10)}...: ${error.message}`, 'ERROR');
+      throw error;
+    }
   }
 }
 
@@ -444,8 +446,8 @@ if (!isMainThread) {
       const newValidCount = updatedUserData.stats.stork_signed_prices_valid_count || 0;
       const newInvalidCount = updatedUserData.stats.stork_signed_prices_invalid_count || 0;
 
-      const actualValidIncrease = newValidCount - previousStats.validCount;
-      const actualInvalidIncrease = newInvalidCount - previousStats.invalidCount;
+      const actualValidIncrease = Math.max(0, newValidCount - previousStats.validCount); // Prevent negative values
+      const actualInvalidIncrease = Math.max(0, newInvalidCount - previousStats.invalidCount); // Prevent negative values
 
       previousStats.validCount = newValidCount;
       previousStats.invalidCount = newInvalidCount;
@@ -457,27 +459,27 @@ if (!isMainThread) {
       log(`Failed: ${actualInvalidIncrease}`);
       log('--------- COMPLETE ---------');
       
-      if(jobs < accounts.length) {
+      if (jobs < accounts.length) {
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
-      } else if(jobs == accounts.length - 1 || jobs === accounts.length) {
+      } else if (jobs === accounts.length - 1 || jobs === accounts.length) {
         jobs = 0;
         setTimeout(() => main(), config.stork.intervalSeconds * 1000);
-      } 
+      }
     } catch (error) {
       log(`Validation process stopped: ${error.message}`, 'ERROR');
     }
   }
 
   function displayStats(userData) {
-  console.clear();
-  console.log(`
+    console.clear();
+    console.log(`
  █████╗ ██████╗ ██████╗     ███╗   ██╗ ██████╗ ██████╗ ███████╗
 ██╔══██╗██╔══██╗██╔══██╗    ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
 ███████║██║  ██║██████╔╝    ██╔██╗ ██║██║   ██║██║  ██║█████╗  
 ██╔══██║██║  ██║██╔══██╗    ██║╚██╗██║██║   ██║██║  ██║██╔══╝  
 ██║  ██║██████╔╝██████╔╝    ██║ ╚████║╚██████╔╝██████╔╝███████╗
 ╚═╝  ╚═╝╚═════╝ ╚═════╝     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
-  `);
+    `);
     console.log(`Time: ${getTimestamp()}`);
     console.log('---------------------------------------------');
     console.log(`User: ${userData.email || 'N/A'}`);
@@ -509,9 +511,6 @@ if (!isMainThread) {
 
       runValidationProcess(tokenManager);
       
-      //prevent spam by disabling this interval, because up there was triggered with jobs sequence
-//     setInterval(() => runValidationProcess(tokenManager), config.stork.intervalSeconds * 1000);
-
       setInterval(async () => {
         await tokenManager.getValidToken();
         log('Token refreshed via Cognito');
